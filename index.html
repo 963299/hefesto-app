@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Hefesto</title>
-  <link rel="manifest" href="manifest.json">
+<link rel="manifest" href="manifest.json">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Nunito:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
@@ -54,7 +54,7 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 .day-chip.done .dc-dot{background:var(--green);}
 .day-chip.active .dc-date,.day-chip.active .dc-name{color:#fff;}
 .detail{padding:0 20px;}
-.day-actions-row{display:flex;gap:8px;align-items:center;margin-bottom:14px;}
+.day-actions-row{display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap;}
 .swap-btn{display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px 12px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;transition:all .2s;}
 .swap-btn:hover{border-color:var(--accent);color:var(--accent);}
 .done-btn{display:flex;align-items:center;gap:6px;background:var(--green);border:none;border-radius:10px;padding:8px 14px;font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;color:#0a1a12;cursor:pointer;}
@@ -134,7 +134,7 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 .photo-upload-icon{font-size:40px;margin-bottom:8px;}
 .photo-upload-label{font-size:14px;color:var(--muted);}
 .photo-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-.photo-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;position:relative;}
+.photo-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;}
 .photo-card img{width:100%;aspect-ratio:3/4;object-fit:cover;display:block;}
 .photo-card-info{padding:8px 10px;display:flex;justify-content:space-between;align-items:center;}
 .photo-card-date{font-size:11px;color:var(--muted);}
@@ -342,9 +342,24 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
   </div>
 </div>
 
+<div class="modal-overlay" id="import-modal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">📋 Importar Semana</div>
+    <div class="modal-sub">Cole o texto completo do seu treino semanal. O app interpreta automaticamente.</div>
+    <textarea id="import-textarea" style="width:100%;height:200px;background:var(--surface3);border:1.5px solid var(--border);border-radius:12px;color:var(--text);font-family:'Nunito',sans-serif;font-size:13px;padding:12px;outline:none;resize:none;margin-bottom:12px;" placeholder="Cole aqui o texto do treino..."></textarea>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="closeImport()">Cancelar</button>
+      <button class="btn-modal-confirm" onclick="processImport()">✨ IMPORTAR</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast-el"></div>
 
 <script>
+
+
   const CYCLE_TEMPLATE = [
   { label:'COSTAS + BÍCEPS', subtitle:'Força e espessura', isRest:false, cardio:'🚴 LISS: 30–40 min (tarde)', warmup:[],
     exercises:[
@@ -405,7 +420,7 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 ];
 
 const KEY='hefesto_v4';
-function loadState(){try{const s=localStorage.getItem(KEY);if(s)return JSON.parse(s);}catch(e){}return{currentDayIndex:null,doneMap:{},customExercises:{},customCardio:{},weights:[],loadHistory:{},photos:[],profile:{nome:'Reizinho',idade:'48',altura:'1.70',peso:'89',pesoinicio:'103',meta:'80',avatar:''}};}
+function loadState(){try{const s=localStorage.getItem(KEY);if(s)return JSON.parse(s);}catch(e){}return{currentDayIndex:null,doneMap:{},customExercises:{},customCardio:{},customLabels:{},weights:[],loadHistory:{},photos:[],profile:{nome:'Reizinho',idade:'48',altura:'1.70',peso:'89',pesoinicio:'103',meta:'80',avatar:''}};}
 function saveState(){localStorage.setItem(KEY,JSON.stringify(ST));}
 let ST=loadState();
 let swapFrom=null,swapTo=null,weightChart=null,loadChart=null,currentPage='treino';
@@ -425,10 +440,25 @@ function getExercises(ci){const k=getDayKey(ci);if(ST.customExercises[k])return 
 function setExercises(ci,arr){ST.customExercises[getDayKey(ci)]=arr;saveState();}
 function getCardio(ci){const k=getDayKey(ci);return ST.customCardio[k]!==undefined?ST.customCardio[k]:CYCLE_TEMPLATE[ci].cardio;}
 function setCardio(ci,v){ST.customCardio[getDayKey(ci)]=v;saveState();}
-  function goPage(p){document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));document.getElementById('page-'+p).classList.add('active');document.getElementById('nav-'+p).classList.add('active');currentPage=p;window.scrollTo({top:0,behavior:'smooth'});if(p==='evolucao')renderEvo();if(p==='perfil')renderPerfil();}
-function render(){const wd=getWeekDays();document.getElementById('today-label').textContent=fmt(today);const done=Object.values(ST.doneMap).filter(Boolean).length;document.getElementById('streak-badge').textContent=`🔥 ${done} treino${done!==1?'s':''} concluído${done!==1?'s':''}`;const ci=ST.currentDayIndex,tmpl=CYCLE_TEMPLATE[ci];document.getElementById('today-title').textContent=tmpl.label;document.getElementById('today-meta').textContent=fmt(wd[ci])+(tmpl.subtitle?' — '+tmpl.subtitle:'');document.getElementById('greeting-name').textContent=(ST.profile.nome||'Reizinho')+' 💪';const ts=document.getElementById('today-stats');const exArr=getExercises(ci);if(!tmpl.isRest){ts.innerHTML=`<div class="stat-pill"><div class="sv">${exArr.length}</div><div class="sl">Exercícios</div></div>${tmpl.cardio?`<div class="stat-pill"><div class="sv">🚴</div><div class="sl">Cardio</div></div>`:''}<div class="stat-pill"><div class="sv">${isDone(ci)?'✅':'○'}</div><div class="sl">Status</div></div>`;}else{ts.innerHTML=`<div class="stat-pill"><div class="sv">😴</div><div class="sl">Descanso</div></div>`;}renderStrip(wd);renderDetail();const av=document.getElementById('topbar-avatar');if(ST.profile.avatar){av.innerHTML=`<img src="${ST.profile.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;}else{av.textContent='👤';}}
-function renderStrip(wd){document.getElementById('week-strip').innerHTML=wd.map((d,i)=>{const tmpl=CYCLE_TEMPLATE[i];const isTodayChip=d.getTime()===today.getTime();const done=isDone(i);let cls='day-chip';if(i===ST.currentDayIndex)cls+=' active';if(isTodayChip&&i!==ST.currentDayIndex)cls+=' today-chip';if(done)cls+=' done';if(tmpl.isRest)cls+=' rest-chip';return `<div class="${cls}" onclick="selectDay(${i})"><div class="dc-date">${fmt(d)}</div><div class="dc-name">${tmpl.label.split(' ')[0]}</div><div class="dc-dot"></div></div>`;}).join('');setTimeout(()=>{const a=document.querySelector('.day-chip.active');if(a)a.scrollIntoView({inline:'center',behavior:'smooth'});},50);}
-function renderDetail(){const ci=ST.currentDayIndex,tmpl=CYCLE_TEMPLATE[ci],det=document.getElementById('detail');if(tmpl.isRest){det.innerHTML=`<div class="rest-view"><div class="rest-emoji">😴</div><div class="rest-title">DESCANSO ATIVO</div><p style="color:var(--muted);font-size:14px;margin-top:8px">Mobilidade + alongamento. Amanhã mais forte.</p></div>`;return;}const exArr=getExercises(ci),cardio=getCardio(ci),done=isDone(ci);const doneBtn=done?`<button class="done-btn undone" onclick="toggleDone()">✓ Concluído</button>`:`<button class="done-btn" onclick="toggleDone()">Marcar Feito ✓</button>`;const warmupHtml=tmpl.warmup&&tmpl.warmup.length?`<div class="warmup-bar"><div class="warmup-title">🔥 AQUECIMENTO OBRIGATÓRIO (5 min)</div>${tmpl.warmup.map(w=>`<div class="warmup-item">→ ${esc(w)}</div>`).join('')}</div>`:'';det.innerHTML=`<div class="day-actions-row"><button class="swap-btn" onclick="openSwap()">⇄ Trocar dia</button>${doneBtn}</div>${warmupHtml}${cardio?`<div class="cardio-bar"><span style="font-size:22px">🚴</span><div style="flex:1"><div class="cardio-lbl">Cardio</div><div class="cardio-val">${esc(cardio)}</div></div><button class="cardio-edit-btn" onclick="editCardio()">✏️</button></div>`:''}<div class="section-title" style="margin-bottom:10px">Exercícios</div>${exArr.map(ex=>renderEx(ex)).join('')}<button class="add-ex-btn" onclick="addEx()">+ Adicionar Exercício</button>`;}
+function getDayLabel(ci){const k=getDayKey(ci);return(ST.customLabels&&ST.customLabels[k])||CYCLE_TEMPLATE[ci].label;}
+function goPage(p){document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));document.getElementById('page-'+p).classList.add('active');document.getElementById('nav-'+p).classList.add('active');currentPage=p;window.scrollTo({top:0,behavior:'smooth'});if(p==='evolucao')renderEvo();if(p==='perfil')renderPerfil();}
+  function render(){const wd=getWeekDays();document.getElementById('today-label').textContent=fmt(today);const done=Object.values(ST.doneMap).filter(Boolean).length;document.getElementById('streak-badge').textContent=`🔥 ${done} treino${done!==1?'s':''} concluído${done!==1?'s':''}`;const ci=ST.currentDayIndex,tmpl=CYCLE_TEMPLATE[ci];document.getElementById('today-title').textContent=getDayLabel(ci);document.getElementById('today-meta').textContent=fmt(wd[ci])+(tmpl.subtitle?' — '+tmpl.subtitle:'');document.getElementById('greeting-name').textContent=(ST.profile.nome||'Reizinho')+' 💪';const ts=document.getElementById('today-stats');const exArr=getExercises(ci);if(!tmpl.isRest){ts.innerHTML=`<div class="stat-pill"><div class="sv">${exArr.length}</div><div class="sl">Exercícios</div></div>${getCardio(ci)?`<div class="stat-pill"><div class="sv">🚴</div><div class="sl">Cardio</div></div>`:''}<div class="stat-pill"><div class="sv">${isDone(ci)?'✅':'○'}</div><div class="sl">Status</div></div>`;}else{ts.innerHTML=`<div class="stat-pill"><div class="sv">😴</div><div class="sl">Descanso</div></div>`;}renderStrip(wd);renderDetail();const av=document.getElementById('topbar-avatar');if(ST.profile.avatar){av.innerHTML=`<img src="${ST.profile.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;}else{av.textContent='👤';}}
+function renderStrip(wd){document.getElementById('week-strip').innerHTML=wd.map((d,i)=>{const tmpl=CYCLE_TEMPLATE[i];const isTodayChip=d.getTime()===today.getTime();const done=isDone(i);let cls='day-chip';if(i===ST.currentDayIndex)cls+=' active';if(isTodayChip&&i!==ST.currentDayIndex)cls+=' today-chip';if(done)cls+=' done';if(tmpl.isRest)cls+=' rest-chip';const lbl=getDayLabel(i).split(' ')[0];return `<div class="${cls}" onclick="selectDay(${i})"><div class="dc-date">${fmt(d)}</div><div class="dc-name">${lbl}</div><div class="dc-dot"></div></div>`;}).join('');setTimeout(()=>{const a=document.querySelector('.day-chip.active');if(a)a.scrollIntoView({inline:'center',behavior:'smooth'});},50);}
+function renderDetail(){
+  const ci=ST.currentDayIndex,tmpl=CYCLE_TEMPLATE[ci],det=document.getElementById('detail');
+  if(tmpl.isRest){
+    det.innerHTML=`
+      <div class="day-actions-row">
+        <button class="swap-btn" onclick="openSwap()">⇄ Trocar dia</button>
+        <button class="swap-btn" onclick="openImport()">📋 Importar semana</button>
+      </div>
+      <div class="rest-view"><div class="rest-emoji">😴</div><div class="rest-title">DESCANSO ATIVO</div><p style="color:var(--muted);font-size:14px;margin-top:8px">Mobilidade + alongamento. Amanhã mais forte.</p></div>`;
+    return;
+  }
+  const exArr=getExercises(ci),cardio=getCardio(ci),done=isDone(ci);
+  const doneBtn=done?`<button class="done-btn undone" onclick="toggleDone()">✓ Concluído</button>`:`<button class="done-btn" onclick="toggleDone()">Marcar Feito ✓</button>`;
+  const warmupHtml=tmpl.warmup&&tmpl.warmup.length?`<div class="warmup-bar"><div class="warmup-title">🔥 AQUECIMENTO OBRIGATÓRIO (5 min)</div>${tmpl.warmup.map(w=>`<div class="warmup-item">→ ${esc(w)}</div>`).join('')}</div>`:'';
+  det.innerHTML=`<div class="day-actions-row"><button class="swap-btn" onclick="openSwap()">⇄ Trocar dia</button><button class="swap-btn" onclick="openImport()">📋 Importar</button>${doneBtn}</div>${warmupHtml}${cardio?`<div class="cardio-bar"><span style="font-size:22px">🚴</span><div style="flex:1"><div class="cardio-lbl">Cardio</div><div class="cardio-val">${esc(cardio)}</div></div><button class="cardio-edit-btn" onclick="editCardio()">✏️</button></div>`:''}<div class="section-title" style="margin-bottom:10px">Exercícios</div>${exArr.map(ex=>renderEx(ex)).join('')}<button class="add-ex-btn" onclick="addEx()">+ Adicionar Exercício</button>`;}
 function renderEx(ex){let sc='';if(ex.special){let cls='chip ';if(ex.special.includes('DROP'))cls+='c-drop';else if(ex.special.includes('REST'))cls+='c-rp';else cls+='c-load';sc=`<span class="${cls}">${esc(ex.special)}</span>`;}const isSS=ex.notes&&ex.notes.toLowerCase().includes('superset');return `<div class="ex-card" id="ex-${ex.id}"><div class="ex-header" onclick="toggleEx(${ex.id})"><div class="ex-num-badge">${esc(ex.num)}</div><div class="ex-info"><div class="ex-name">${esc(ex.name)}</div><div class="ex-chips"><span class="chip">${esc(ex.sets)}×${esc(ex.reps)}</span>${ex.load&&ex.load!=='—'?`<span class="chip c-load">${esc(ex.load)}</span>`:''}${ex.rest&&ex.rest!=='—'?`<span class="chip c-rest">⏱${esc(ex.rest)}</span>`:''}${sc}${isSS?`<span class="chip c-drop">Superset</span>`:''}</div></div><div class="ex-expand">⌄</div></div><div class="ex-body">${ex.notes&&!isSS?`<div class="ex-notes-text">${esc(ex.notes)}</div>`:''}<div class="edit-form"><div class="form-row"><div class="form-field" style="flex:2"><label>Nome</label><input id="ef-name-${ex.id}" value="${esc(ex.name)}"></div><div class="form-field" style="max-width:60px"><label>Nº</label><input id="ef-num-${ex.id}" value="${esc(ex.num)}"></div></div><div class="form-row"><div class="form-field"><label>Séries</label><input id="ef-sets-${ex.id}" value="${esc(ex.sets)}"></div><div class="form-field"><label>Reps</label><input id="ef-reps-${ex.id}" value="${esc(ex.reps)}"></div><div class="form-field"><label>Carga</label><input id="ef-load-${ex.id}" value="${esc(ex.load)}"></div><div class="form-field"><label>Descanso</label><input id="ef-rest-${ex.id}" value="${esc(ex.rest)}"></div></div><div class="form-row"><div class="form-field"><label>Técnica</label><input id="ef-special-${ex.id}" value="${esc(ex.special)}" placeholder="DROP, REST-PAUSE..."></div></div><div class="form-row"><div class="form-field"><label>Notas</label><textarea id="ef-notes-${ex.id}">${esc(ex.notes)}</textarea></div></div><div class="form-actions"><button class="btn-save" onclick="saveEx(${ex.id})">SALVAR</button><button class="btn-del" onclick="delEx(${ex.id})">🗑</button></div></div></div></div>`;}
 function toggleEx(id){document.getElementById('ex-'+id).classList.toggle('open');}
 function selectDay(i){ST.currentDayIndex=i;saveState();render();window.scrollTo({top:0,behavior:'smooth'});}
@@ -437,10 +467,14 @@ function saveEx(id){const exArr=getExercises(ST.currentDayIndex),ex=exArr.find(e
 function delEx(id){if(!confirm('Remover exercício?'))return;let exArr=getExercises(ST.currentDayIndex);exArr=exArr.filter(e=>e.id!==id);setExercises(ST.currentDayIndex,exArr);renderDetail();showToast('Removido');}
 function addEx(){const exArr=getExercises(ST.currentDayIndex);const ex={id:Date.now(),num:String(exArr.length+1),name:'Novo Exercício',sets:'3',reps:'12',load:'—',rest:'60s',special:'',notes:''};exArr.push(ex);setExercises(ST.currentDayIndex,exArr);renderDetail();setTimeout(()=>{const c=document.getElementById('ex-'+ex.id);if(c){c.classList.add('open');c.scrollIntoView({behavior:'smooth',block:'nearest'});}},100);}
 function editCardio(){const val=prompt('Cardio:',getCardio(ST.currentDayIndex)||'');if(val===null)return;setCardio(ST.currentDayIndex,val.trim());renderDetail();showToast('Cardio atualizado!');}
-function openSwap(){swapFrom=ST.currentDayIndex;swapTo=null;const wd=getWeekDays();document.getElementById('swap-from-name').textContent=CYCLE_TEMPLATE[swapFrom].label+' ('+fmt(wd[swapFrom])+')';document.getElementById('swap-list').innerHTML=wd.map((d,i)=>{if(i===swapFrom)return'';return`<div class="swap-opt" id="sopt-${i}" onclick="selSwap(${i})"><div><div class="swap-opt-name">${CYCLE_TEMPLATE[i].label}</div><div class="swap-opt-date">${fmt(d)}</div></div><span style="color:var(--muted)">⇄</span></div>`;}).join('');document.getElementById('swap-modal').classList.add('open');}
+function openSwap(){swapFrom=ST.currentDayIndex;swapTo=null;const wd=getWeekDays();document.getElementById('swap-from-name').textContent=getDayLabel(swapFrom)+' ('+fmt(wd[swapFrom])+')';document.getElementById('swap-list').innerHTML=wd.map((d,i)=>{if(i===swapFrom)return'';return`<div class="swap-opt" id="sopt-${i}" onclick="selSwap(${i})"><div><div class="swap-opt-name">${getDayLabel(i)}</div><div class="swap-opt-date">${fmt(d)}</div></div><span style="color:var(--muted)">⇄</span></div>`;}).join('');document.getElementById('swap-modal').classList.add('open');}
 function selSwap(i){swapTo=i;document.querySelectorAll('.swap-opt').forEach(e=>e.classList.remove('sel'));const el=document.getElementById('sopt-'+i);if(el)el.classList.add('sel');}
 function confirmSwap(){if(swapTo===null){showToast('Selecione um dia!');return;}const kA=getDayKey(swapFrom),kB=getDayKey(swapTo);const eA=getExercises(swapFrom),eB=getExercises(swapTo),cA=getCardio(swapFrom),cB=getCardio(swapTo);ST.customExercises[kA]=eB;ST.customExercises[kB]=eA;ST.customCardio[kA]=cB;ST.customCardio[kB]=cA;closeModal();saveState();render();showToast('✅ Treinos trocados!');}
 function closeModal(){document.getElementById('swap-modal').classList.remove('open');}
+function openImport(){document.getElementById('import-textarea').value='';document.getElementById('import-modal').classList.add('open');}
+function closeImport(){document.getElementById('import-modal').classList.remove('open');}
+function processImport(){const txt=document.getElementById('import-textarea').value.trim();if(!txt){showToast('Cole o texto do treino!');return;}const days=parseTreino(txt);if(!days||!days.length){showToast('Não consegui interpretar. Verifique o formato.');return;}const wd=getWeekDays();days.forEach((day,i)=>{if(i>6)return;const k=fmt(wd[i])+'_'+wd[i].getFullYear();if(day.exercises&&day.exercises.length)ST.customExercises[k]=day.exercises;if(day.cardio!==undefined)ST.customCardio[k]=day.cardio;if(day.label){if(!ST.customLabels)ST.customLabels={};ST.customLabels[k]=day.label;}});saveState();closeImport();render();showToast(`✅ ${days.length} dias importados!`);}
+function parseTreino(txt){const blocks=txt.split(/(?=🟢)/g).filter(b=>b.trim());const days=[];for(const block of blocks){const lines=block.split('\n').map(l=>l.trim()).filter(Boolean);if(!lines.length)continue;const titleLine=lines[0];const labelMatch=titleLine.match(/\)\s*(.+?)(?:\s*\(|$)/);const label=labelMatch?labelMatch[1].trim():titleLine.replace(/🟢/g,'').replace(/\(.*?\)/g,'').trim();if(!label||label.toLowerCase().includes('regra')||label.toLowerCase().includes('duração')||label.toLowerCase().includes('proteína'))continue;let cardio='';const cardioLine=lines.find(l=>/LISS|HIIT/i.test(l));if(cardioLine)cardio=cardioLine.replace(/^[→\-\s🚴⚡]+/,'').trim();const exercises=[];let num=1;for(let idx=0;idx<lines.length;idx++){const line=lines[idx];const exMatch=line.match(/^(?:\d+[️⃣]?\s+|[1-9]+️⃣\s+)(.+?):\s*(\d+)×([\d–\-]+)(?:\s*[—-]\s*([\d\.]+\s*kg))?(?:\s*⏱️?\s*(\d+s))?/);if(exMatch){const name=exMatch[1].trim();const sets=exMatch[2];const reps=exMatch[3];const load=exMatch[4]?exMatch[4].trim():'—';const rest=exMatch[5]||'—';const nextLine=lines[idx+1]||'';const special=nextLine.toLowerCase().includes('drop duplo')?'DROP DUPLO':nextLine.toLowerCase().includes('drop')?'DROP':'';const notes=special?nextLine.replace(/^→\s*/,'').trim():'';exercises.push({id:Date.now()+num*13,num:String(num),name,sets,reps,load,rest,special,notes});num++;}}days.push({label,cardio,exercises});}return days;}
   function evoTab(tab){document.querySelectorAll('.evo-tab').forEach(el=>el.classList.remove('active'));document.querySelectorAll('.evo-panel').forEach(el=>el.classList.remove('active'));event.target.classList.add('active');document.getElementById('panel-'+tab).classList.add('active');if(tab==='peso')renderWeightChart();if(tab==='carga')renderLoadChart();if(tab==='fotos')renderPhotos();}
 function renderEvo(){populateExSelect();renderWeightList();renderWeightChart();renderPhotos();}
 function addWeight(){const v=parseFloat(document.getElementById('weight-input').value);if(isNaN(v)||v<20||v>300){showToast('Peso inválido');return;}const entry={date:today.toISOString().split('T')[0],value:v,ts:Date.now()};ST.weights.push(entry);saveState();ST.profile.peso=String(v);saveState();document.getElementById('weight-input').value='';renderWeightList();renderWeightChart();showToast('⚖️ Peso registrado!');}
@@ -458,6 +492,7 @@ function renderPerfil(){const p=ST.profile;const av=document.getElementById('pro
 function editProfileField(field,label,current){const val=prompt(label+':',ST.profile[field]||current);if(val===null)return;ST.profile[field]=val.trim();saveState();renderPerfil();render();showToast('✅ Salvo!');}
 function showToast(msg){const t=document.getElementById('toast-el');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2400);}
 document.getElementById('swap-modal').addEventListener('click',function(e){if(e.target===this)closeModal();});
+document.getElementById('import-modal').addEventListener('click',function(e){if(e.target===this)closeImport();});
 render();
 </script>
 </body>
