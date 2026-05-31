@@ -762,82 +762,118 @@ function parseProgramText(text){
   const lines = text.split('\n').map(l=>l.trim()).filter(l=>l);
   const days = [];
   let current = null;
+  let pendingDrop = false; // flag for "→ drop" line after exercise
 
-  const dayPatterns = [
-    /^treino\s+[a-zA-Z0-9]+\s*[-–—:]/i,
-    /^(seg|ter|qua|qui|sex|sab|dom|segunda|terça|quarta|quinta|sexta|sábado|domingo)\s*[-–—:]/i,
-    /^dia\s+\d+\s*[-–—:]/i,
-    /^\*{1,2}treino/i,
-    /^[A-Z]\s*[-–—]\s+\S/,
-    /^#\s*.+/,
-    /^---/,
-  ];
-  const warmupPatterns = [/aquecimento/i, /warm.?up/i];
-  const cardioPatterns = [/cardio/i, /esteira/i, /bicicleta/i, /corrida/i, /caminhada/i];
-  const restPatterns = [/descanso|folga|rest day/i];
-  const exPattern = /^\d+[\.\)]/;
-
-  function isNewDay(line){
-    return dayPatterns.some(p=>p.test(line));
+  // Remove all emoji characters for pattern matching
+  function stripEmoji(s){
+    return s.replace(/[\u{1F000}-\u{1FFFF}|\u{2600}-\u{27FF}|\u{FE00}-\u{FEFF}|\u{1F1E0}-\u{1F1FF}|\u{200D}|\u{20E3}|\u{FE0F}]/gu,'')
+            .replace(/[🟢🔴🟡🔵⚡🔥🧘⚠️⏳🥩🚴🏋]/g,'')
+            .replace(/\uFE0F/g,'').trim();
   }
 
-  function cleanName(line){
-    return line.replace(/^#+\s*/,'').replace(/^\*+/,'').replace(/^---+/,'').replace(/[-–—:]\s*/,'').trim();
+  // Detect day header: has a date pattern (dd/mm/yy) OR starts with "Treino X"
+  function isNewDay(line){
+    const clean = stripEmoji(line);
+    return /\(\d{2}\/\d{2}\/\d{2,4}\)/.test(clean)  // (01/06/26)
+      || /^treino\s+[a-zA-Z0-9]/i.test(clean)
+      || /^(seg|ter|qua|qui|sex|sab|dom|segunda|terça|quarta|quinta|sexta|sábado|domingo)\s*[-–—:]/i.test(clean)
+      || /^dia\s+\d+\s*[-–—:]/i.test(clean)
+      || /^#\s*.+/.test(clean);
+  }
+
+  // Build clean day name: remove emoji, remove date, keep the actual name
+  function buildDayName(line){
+    let s = stripEmoji(line);
+    s = s.replace(/\(\d{2}\/\d{2}\/\d{2,4}\)\s*/,''); // remove (01/06/26)
+    s = s.replace(/^[-–—:\s]+/,'').trim();
+    return s || line.substring(0,40);
+  }
+
+  // Detect exercise lines: starts with digit+emoji like 1️⃣ or plain "1." or "1)"
+  function isExLine(line){
+    const clean = stripEmoji(line);
+    return /^\d+[\.\)]/.test(clean) || /^\d+\s*[:\-]/.test(clean);
+  }
+
+  // Detect drop/note continuation lines
+  function isDropLine(line){
+    return /→\s*drop/i.test(line) || /drop\s*simples/i.test(line) || /drop\s*duplo/i.test(line);
+  }
+
+  const warmupPatterns = [/aquecimento/i, /warm.?up/i, /foco:/i];
+  const cardioPatterns = [/liss/i, /hiit/i, /cardio/i, /esteira/i, /bicicleta/i, /corrida/i, /caminhada/i];
+  const restPatterns = [/descanso ativo|descanso|folga|rest day/i];
+  // Lines to skip (program notes, rules etc)
+  const skipPatterns = [/^⚠️|^⏳|^🥩|^regras|^duração|^faça \d|^o que mudei|^→ bateu|^→ falha|^→ drop set só|^→ descanso por|^→ falhou/i];
+
+  function isNewDay(line){
+    const clean = stripEmoji(line);
+    return /\(\d{2}\/\d{2}\/\d{2,4}\)/.test(line)
+      || /^treino\s+[a-zA-Z0-9]/i.test(clean)
+      || /^(seg|ter|qua|qui|sex|sab|dom|segunda|terça|quarta|quinta|sexta|sábado|domingo)\s*[-–—:]/i.test(clean)
+      || /^dia\s+\d+\s*[-–—:]/i.test(clean)
+      || /^#\s*.+/.test(clean);
   }
 
   function parseExercise(line){
-    // Remove leading number
-    let l = line.replace(/^\d+[\.\)]\s*/,'').trim();
+    // Remove leading number+emoji like "1️⃣" or "1."
+    let l = stripEmoji(line).replace(/^\d+[\.\)\:]\s*/,'').trim();
     // Drop set detection
-    const dropset = /drop.?set/i.test(l);
-    l = l.replace(/drop.?set/gi,'').trim();
+    const dropset = /drop/i.test(l);
+    l = l.replace(/drop\s*(simples|duplo|set)?/gi,'').trim();
     // Extract load like "75kg" or "75 kg"
-    const loadMatch = l.match(/(\d+(?:[.,]\d+)?)\s*kg/i);
+    const loadMatch = l.match(/—\s*(\d+(?:[.,]\d+)?)\s*kg/i) || l.match(/(\d+(?:[.,]\d+)?)\s*kg/i);
     const load = loadMatch ? loadMatch[1].replace(',','.') : '';
     if(loadMatch) l = l.replace(loadMatch[0],'').trim();
-    // Extract sets x reps like "4x12" or "4 x 12" or "4 séries de 12"
-    const setsRepsMatch = l.match(/(\d+)\s*[xX×]\s*(\d+(?:-\d+)?)/);
+    // Extract sets x reps like "4×10–12" or "4x12"
+    const setsRepsMatch = l.match(/(\d+)\s*[×xX]\s*(\d+(?:[–\-]\d+)?)/);
     let sets='', reps='';
     if(setsRepsMatch){ sets=setsRepsMatch[1]; reps=setsRepsMatch[2]; l=l.replace(setsRepsMatch[0],'').trim(); }
-    // Extract rest like "90s" or "90 segundos" or "1min"
-    const restMatch = l.match(/(\d+)\s*(s|seg|segundos?|min|minutos?)/i);
+    // Extract rest like ⏱️90s or "90s" or "90 seg"
+    const restMatch = l.match(/⏱️?\s*(\d+)\s*(s|seg|segundos?|min|minutos?)/i);
     let rest = '';
     if(restMatch){ rest=restMatch[1]+(restMatch[2].startsWith('m')?'min':'s'); l=l.replace(restMatch[0],'').trim(); }
-    // Name is whatever is left (clean up punctuation)
-    let name = l.replace(/\s{2,}/g,' ').replace(/[,;]+$/,'').trim();
-    if(!name) name = line.replace(/^\d+[\.\)]\s*/,'').split(/\s+/).slice(0,4).join(' ');
+    // Clean up name
+    let name = l.replace(/—/g,'').replace(/\s{2,}/g,' ').replace(/[,;:→]+$/,'').trim();
+    if(!name) name = stripEmoji(line).replace(/^\d+[\.\)]\s*/,'').split(/\s+/).slice(0,5).join(' ');
     return {name, sets, reps, load, rest, notes:'', dropset};
   }
 
   for(let i=0;i<lines.length;i++){
     const line = lines[i];
+
+    // Skip program-level notes/rules
+    if(skipPatterns.some(p=>p.test(line))) continue;
+
     if(isNewDay(line)){
-      const name = cleanName(line) || line;
+      const name = buildDayName(line);
       const isRest = restPatterns.some(p=>p.test(line));
       current = {name, exercises:[], warmup:[], cardio:'', isRest};
       days.push(current);
+      pendingDrop = false;
     } else if(!current){
-      // lines before first day marker — start a default day
-      current = {name: line, exercises:[], warmup:[], cardio:'', isRest:false};
-      days.push(current);
-    } else if(restPatterns.some(p=>p.test(line))){
+      continue;
+    } else if(isDropLine(line) && current.exercises.length){
+      // Mark last exercise as dropset
+      current.exercises[current.exercises.length-1].dropset = true;
+    } else if(restPatterns.some(p=>p.test(line)) && !isExLine(line)){
       current.isRest = true;
-    } else if(warmupPatterns.some(p=>p.test(line))){
-      // next lines until blank or exercise are warmup items
-      // Just store the line itself as a warmup item
-      const wItem = line.replace(/aquecimento\s*[:\-–]?\s*/i,'').trim();
+    } else if(warmupPatterns.some(p=>p.test(line)) && !isExLine(line)){
+      const wItem = stripEmoji(line).replace(/aquecimento\s*[:\-–]?\s*/i,'').replace(/foco\s*:\s*/i,'').trim();
       if(wItem) current.warmup.push(wItem);
-    } else if(cardioPatterns.some(p=>p.test(line)) && !exPattern.test(line)){
-      current.cardio = line;
-    } else if(exPattern.test(line)){
+    } else if(cardioPatterns.some(p=>p.test(line)) && !isExLine(line)){
+      current.cardio = stripEmoji(line).trim();
+    } else if(isExLine(line)){
       current.exercises.push(parseExercise(line));
-    } else if(current.warmup.length && !exPattern.test(line) && !isNewDay(line) && line.length < 80){
-      // continuation of warmup list
-      current.warmup.push(line);
+    } else if(line.startsWith('→') && current.warmup.length && !isExLine(line) && !isDropLine(line)){
+      // Warmup sub-item
+      current.warmup.push(stripEmoji(line).replace(/^→\s*/,'').trim());
     }
   }
   return days.filter(d=>d.name);
 }
+
+
 
 function renderProgramSummary(){
   const area = document.getElementById('program-summary-area');
