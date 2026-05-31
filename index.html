@@ -647,7 +647,10 @@ function editCardio(di){
 }
 
 function scrollToDetail(){
-  document.getElementById('detail').scrollIntoView({behavior:'smooth'});
+  const el = document.getElementById('detail');
+  if(!el) return;
+  const y = el.getBoundingClientRect().top + window.pageYOffset - 10;
+  window.scrollTo({top: y, behavior:'smooth'});
 }
 
 // ============================================================
@@ -789,13 +792,16 @@ function parseProgramText(text){
     return s || line.substring(0,40);
   }
 
-  // Detect exercise lines: starts with digit+emoji like 1️⃣ or plain "1." or "1)"
+  // Detect exercise lines: "1️⃣ Remada" → stripEmoji → "1 Remada"
   function isExLine(line){
     const clean = stripEmoji(line);
-    return /^\d+[\.\)]/.test(clean) || /^\d+\s*[:\-]/.test(clean);
+    if(/^\d+[\.\)\:]\s/.test(clean)) return true;
+    // emoji number becomes "1 Word" after strip
+    if(/^\d+\s+[A-ZÀ-Úa-z]/.test(clean)) return true;
+    return false;
   }
 
-  // Detect drop/note continuation lines
+  // Detect drop lines
   function isDropLine(line){
     return /→\s*drop/i.test(line) || /drop\s*simples/i.test(line) || /drop\s*duplo/i.test(line);
   }
@@ -803,17 +809,7 @@ function parseProgramText(text){
   const warmupPatterns = [/aquecimento/i, /warm.?up/i, /foco:/i];
   const cardioPatterns = [/liss/i, /hiit/i, /cardio/i, /esteira/i, /bicicleta/i, /corrida/i, /caminhada/i];
   const restPatterns = [/descanso ativo|descanso|folga|rest day/i];
-  // Lines to skip (program notes, rules etc)
   const skipPatterns = [/^⚠️|^⏳|^🥩|^regras|^duração|^faça \d|^o que mudei|^→ bateu|^→ falha|^→ drop set só|^→ descanso por|^→ falhou/i];
-
-  function isNewDay(line){
-    const clean = stripEmoji(line);
-    return /\(\d{2}\/\d{2}\/\d{2,4}\)/.test(line)
-      || /^treino\s+[a-zA-Z0-9]/i.test(clean)
-      || /^(seg|ter|qua|qui|sex|sab|dom|segunda|terça|quarta|quinta|sexta|sábado|domingo)\s*[-–—:]/i.test(clean)
-      || /^dia\s+\d+\s*[-–—:]/i.test(clean)
-      || /^#\s*.+/.test(clean);
-  }
 
   function parseExercise(line){
     // Remove leading number+emoji like "1️⃣" or "1."
