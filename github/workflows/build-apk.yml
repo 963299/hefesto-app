@@ -1,0 +1,45 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install Bubblewrap
+        run: npm install -g @bubblewrap/cli
+
+      - name: Initialize Bubblewrap
+        run: |
+          bubblewrap init --manifest https://963299.github.io/hefesto-app/manifest.json --directory ./twa
+        env:
+          BUBBLEWRAP_SKIP_UPDATE_CHECK: true
+
+      - name: Build APK
+        run: |
+          cd twa
+          bubblewrap build --skipPwaValidation
+        env:
+          BUBBLEWRAP_SKIP_UPDATE_CHECK: true
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: hefesto-apk
+          path: twa/app-release-unsigned.apk
