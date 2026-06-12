@@ -638,7 +638,7 @@ function buildExChips(ex){
   if(ex.sets||ex.reps) c+=`<span class="chip">${ex.sets||'?'}×${ex.reps||'?'}</span>`;
   if(ex.load) c+=`<span class="chip c-load">${ex.load}kg</span>`;
   if(ex.rest) c+=`<span class="chip c-rest">${ex.rest}</span>`;
-  if(ex.dropset) c+=`<span class="chip c-drop">drop set</span>`;
+  if(ex.dropset){ const dt=ex.dropType||'simples'; const label=dt==='duplo'?'drop duplo':dt==='triplo'?'drop triplo':'drop'; c+=`<span class="chip c-drop">${label}</span>`; }
   return c;
 }
 
@@ -853,8 +853,10 @@ function parseProgramText(text){
     // Remove leading number+emoji like "1️⃣" or "1."
     let l = stripEmoji(line).replace(/^\d+[\.\)\:]\s*/,'').trim();
     // Drop set detection
-    const dropset = /drop/i.test(l);
-    l = l.replace(/drop\s*(simples|duplo|set)?/gi,'').trim();
+    const dropMatch = l.match(/drop\s*(triplo|duplo|simples|set)?/i);
+    const dropset = !!dropMatch;
+    const dropType = dropMatch ? (dropMatch[1]||'simples').toLowerCase().replace('set','simples') : '';
+    l = l.replace(/drop\s*(triplo|duplo|simples|set)?/gi,'').trim();
     // Extract load like "75kg" or "75 kg"
     const loadMatch = l.match(/—\s*(\d+(?:[.,]\d+)?)\s*kg/i) || l.match(/(\d+(?:[.,]\d+)?)\s*kg/i);
     const load = loadMatch ? loadMatch[1].replace(',','.') : '';
@@ -870,7 +872,7 @@ function parseProgramText(text){
     // Clean up name
     let name = l.replace(/—/g,'').replace(/\s{2,}/g,' ').replace(/[,;:→]+$/,'').trim();
     if(!name) name = stripEmoji(line).replace(/^\d+[\.\)]\s*/,'').split(/\s+/).slice(0,5).join(' ');
-    return {name, sets, reps, load, rest, notes:'', dropset};
+    return {name, sets, reps, load, rest, notes:'', dropset, dropType};
   }
 
   for(let i=0;i<lines.length;i++){
@@ -891,7 +893,9 @@ function parseProgramText(text){
       continue;
     } else if(isDropLine(line) && current.exercises.length){
       // Mark last exercise as dropset
+      const dm = line.match(/drop\s*(triplo|duplo|simples)?/i);
       current.exercises[current.exercises.length-1].dropset = true;
+      current.exercises[current.exercises.length-1].dropType = dm ? (dm[1]||'simples').toLowerCase() : 'simples';
     } else if(restPatterns.some(p=>p.test(line)) && !isExLine(line)){
       current.isRest = true;
     } else if(warmupPatterns.some(p=>p.test(line)) && !isExLine(line)){
