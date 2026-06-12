@@ -493,20 +493,17 @@ function renderWeekStrip(){
   }
   const today = todayKey();
   const now = new Date();
-  const dow = (now.getDay()+6)%7; // 0=Mon
   strip.innerHTML = '';
   program.forEach((day, i)=>{
     const chip = document.createElement('div');
     chip.className = 'day-chip'+(i===currentDayIdx?' active':'');
-    const isToday = (i === (dow % program.length));
-    if(isToday && i!==currentDayIdx) chip.classList.add('today-chip');
+    if(i===currentDayIdx) chip.classList.add('today-chip');
     const isDone = Object.values(completedDays).includes(i) && Object.keys(completedDays).some(k=>completedDays[k]===i && k===today);
     if(isDone) chip.classList.add('done');
     if(day.isRest) chip.classList.add('rest-chip');
     const shortName = day.name.length>8?day.name.substring(0,7)+'…':day.name;
-    const chipDate = new Date(now); chipDate.setDate(now.getDate() + (i - dow));
-    const chipDay = String(chipDate.getDate()).padStart(2,'0'); const chipMon = String(chipDate.getMonth()+1).padStart(2,'0');
-    chip.innerHTML = `<div class="dc-date">${chipDay}/${chipMon}</div><div class="dc-name">${shortName}</div><div class="dc-dot"></div>`;
+    const chipLabel = day.date ? day.date.substring(0,5) : (() => { const chipDate = new Date(now); chipDate.setDate(now.getDate() + (i - currentDayIdx)); return String(chipDate.getDate()).padStart(2,'0')+'/'+String(chipDate.getMonth()+1).padStart(2,'0'); })();
+    chip.innerHTML = `<div class="dc-date">${chipLabel}</div><div class="dc-name">${shortName}</div><div class="dc-dot"></div>`;
     chip.onclick = ()=>{ currentDayIdx=i; renderWeekStrip(); renderDetail(); updateTodayCard(); };
     strip.appendChild(chip);
   });
@@ -885,7 +882,9 @@ function parseProgramText(text){
     if(isNewDay(line)){
       const name = buildDayName(line);
       const isRest = restPatterns.some(p=>p.test(line));
-      current = {name, exercises:[], warmup:[], cardio:'', isRest};
+      const dateMatch = stripEmoji(line).match(/\((\d{2}\/\d{2}\/\d{2,4})\)/);
+      const date = dateMatch ? dateMatch[1] : '';
+      current = {name, exercises:[], warmup:[], cardio:'', isRest, date};
       days.push(current);
       pendingDrop = false;
     } else if(!current){
