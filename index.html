@@ -504,7 +504,9 @@ function renderWeekStrip(){
     if(isDone) chip.classList.add('done');
     if(day.isRest) chip.classList.add('rest-chip');
     const shortName = day.name.length>8?day.name.substring(0,7)+'…':day.name;
-    chip.innerHTML = `<div class="dc-date">D${i+1}</div><div class="dc-name">${shortName}</div><div class="dc-dot"></div>`;
+    const chipDate = new Date(now); chipDate.setDate(now.getDate() + (i - dow));
+    const chipDay = String(chipDate.getDate()).padStart(2,'0'); const chipMon = String(chipDate.getMonth()+1).padStart(2,'0');
+    chip.innerHTML = `<div class="dc-date">${chipDay}/${chipMon}</div><div class="dc-name">${shortName}</div><div class="dc-dot"></div>`;
     chip.onclick = ()=>{ currentDayIdx=i; renderWeekStrip(); renderDetail(); updateTodayCard(); };
     strip.appendChild(chip);
   });
