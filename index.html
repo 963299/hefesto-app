@@ -831,11 +831,14 @@ function parseProgramText(text){
   }
 
   // Detect exercise lines: "1️⃣ Remada" → stripEmoji → "1 Remada"
+  // Also handles superset format: "1A️⃣ Tríceps" or "1A Tríceps"
   function isExLine(line){
     const clean = stripEmoji(line);
     if(/^\d+[\.\)\:]\s/.test(clean)) return true;
     // emoji number becomes "1 Word" after strip
     if(/^\d+\s+[A-ZÀ-Úa-z]/.test(clean)) return true;
+    // superset format: "1A Tríceps" or "2B Rosca"
+    if(/^\d+[A-Ba-b]\s+[A-ZÀ-Úa-z]/i.test(clean)) return true;
     return false;
   }
 
@@ -847,11 +850,11 @@ function parseProgramText(text){
   const warmupPatterns = [/aquecimento/i, /warm.?up/i, /foco:/i];
   const cardioPatterns = [/liss/i, /hiit/i, /cardio/i, /esteira/i, /bicicleta/i, /corrida/i, /caminhada/i];
   const restPatterns = [/descanso ativo|descanso|folga|rest day/i];
-  const skipPatterns = [/^⚠️|^⏳|^🥩|^regras|^duração|^faça \d|^o que mudei|^→ bateu|^→ falha|^→ drop set só|^→ descanso por|^→ falhou/i];
+  const skipPatterns = [/^⚠️|^⏳|^🥩|^regras|^duração|^faça \d|^o que mudei|^→ bateu|^→ falha|^→ drop set só|^→ descanso por|^→ falhou/i, /^\*?execute:/i, /^par\s+\d+\s*[—–-]/i];
 
   function parseExercise(line){
-    // Remove leading number+emoji like "1️⃣" or "1."
-    let l = stripEmoji(line).replace(/^\d+[\.\)\:]\s*/,'').trim();
+    // Remove leading number+emoji like "1️⃣" or "1." or superset "1A" / "2B"
+    let l = stripEmoji(line).replace(/^\d+[A-Ba-b]?\s*[\.\)\:]?\s*/,'').trim();
     // Drop set detection
     const dropMatch = l.match(/drop\s*(triplo|duplo|simples|set)?/i);
     const dropset = !!dropMatch;
