@@ -988,41 +988,34 @@ Se não houver exercícios claros, retorne: []`;
 function renderProgramSummary(){
   const area=document.getElementById('program-summary-area');
   if(!program.length){area.innerHTML='';return;}
-  let html='<div class="profile-section-title">Programa Atual</div>';
+  let h='<div class="profile-section-title">Programa Atual</div>';
   program.forEach((day,i)=>{
     const exCount=(day.exercises||[]).length;
-    html+=`<div class="program-summary">
-      <div class="ps-title">D${i+1} — ${day.name}</div>
-      <div class="ps-row"><span>${day.isRest?'Descanso':'Treino'}</span><span>${exCount} ex</span></div>
-    </div>`;
+    h+='<div class="program-summary"><div class="ps-title">D'+(i+1)+' — '+day.name+'</div><div class="ps-row"><span>'+(day.isRest?'Descanso':'Treino')+'</span><span>'+exCount+' ex</span></div></div>';
   });
-  area.innerHTML=html;
+  area.innerHTML=h;
 }
 
 function exportProgram(){
   if(!program.length){showToast('Nenhum programa para exportar');return;}
-  let text='';
+  const lines=[];
   program.forEach((day,i)=>{
-    text+=`Treino ${String.fromCharCode(65+i)} - ${day.name}
-`;
-    if(day.warmup&&day.warmup.length)text+=`Aquecimento: ${day.warmup.join(', ')}
-`;
-    if(day.cardio)text+=`Cardio: ${day.cardio}
-`;
+    lines.push('Treino '+String.fromCharCode(65+i)+' - '+day.name);
+    if(day.warmup&&day.warmup.length)lines.push('Aquecimento: '+day.warmup.join(', '));
+    if(day.cardio)lines.push('Cardio: '+day.cardio);
     (day.exercises||[]).forEach((ex,j)=>{
       const prefix=ex.supersetGroup?(ex.supersetGroup+ex.supersetLetter+'.'):(j+1)+'.';
-      text+=`${prefix} ${ex.name}`;
-      if(ex.sets||ex.reps)text+=` ${ex.sets}x${ex.reps}`;
-      if(ex.load)text+=` ${ex.load}kg`;
-      if(ex.rest)text+=` descanso ${ex.rest}`;
-      if(ex.dropset)text+=` drop set`;
-      if(ex.notes)text+=` | ${ex.notes}`;
-      text+='
-';
+      let line=prefix+' '+ex.name;
+      if(ex.sets||ex.reps)line+=' '+ex.sets+'x'+ex.reps;
+      if(ex.load)line+=' '+ex.load+'kg';
+      if(ex.rest)line+=' descanso '+ex.rest;
+      if(ex.dropset)line+=' drop set';
+      if(ex.notes)line+=' | '+ex.notes;
+      lines.push(line);
     });
-    text+='
-';
+    lines.push('');
   });
+  const text=lines.join('\n');
   navigator.clipboard.writeText(text).then(()=>showToast('Programa copiado! 📋')).catch(()=>{
     const ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';
     document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);showToast('Programa copiado! 📋');
